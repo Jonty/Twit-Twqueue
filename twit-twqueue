@@ -1,0 +1,139 @@
+#!/usr/bin/env python
+import os, sys, logging, pickle, optparse
+from collections import deque
+
+logging.basicConfig(level=logging.INFO)
+
+# Most platforms don't have this packaged, so it's bundled
+sys.path.append('tweepy')
+import tweepy
+
+class Twqueue:
+
+    def __init__(self, con_key, con_sec, auth_file, queue_file):
+
+        self.log = logging.getLogger('Twit-Twqueue')
+        self.con_key    = con_key
+        self.con_sec    = con_sec
+        self.auth_file  = auth_file
+        self.queue_file = queue_file
+
+
+    def fetch_queue(self):
+
+        f = open(self.queue_file, 'r')
+        raw_file = f.read()
+        f.close()
+
+        queue = deque()
+        if raw_file:
+            queue.extend(raw_file.strip().split("\n"))
+
+        return queue
+
+
+    def store_queue(self, queue):
+
+        f = open(self.queue_file, 'w')
+        f.write("\n".join(queue))
+
+
+    def fetch_messages(self):
+
+        auth    = self.get_auth()
+        queue   = self.fetch_queue()
+
+        direct_messages = tweepy.API(auth).direct_messages()
+        direct_messages.reverse()
+
+        for msg in direct_messages:
+
+            self.log.info("DM recieved from %s: '%s'" % (msg.sender_screen_name, msg.text))
+            queue.append(msg.text)
+            tweepy.API(auth).destroy_direct_message(msg.id)
+
+        self.store_queue(queue)
+
+
+    def post_messages(self, amount):
+
+        auth    = self.get_auth()
+        queue   = self.fetch_queue()
+
+        for i in range(0, amount):
+            if queue:
+
+                msg = queue.popleft()
+                if msg:
+                    self.log.info("Posting message: %s" % msg)
+                    tweepy.API(auth).update_status(msg)
+        
+        self.store_queue(queue)
+
+
+    def authenticate(self):
+
+        auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+
+        print "\nOpen this URL and, then input the PIN you are given.\n\n\t%s\n" % auth.get_authorization_url()
+
+        pin = raw_input('PIN: ').strip()
+        token = auth.get_access_token(verifier = pin)
+
+        if token:
+            pickle.dump(token, open(self.auth_file, 'wb'))
+
+        return token
+
+
+    def get_auth(self):
+
+        token = ''
+        if os.path.exists(self.auth_file):
+            token = pickle.load(open(self.auth_file))
+        else:
+            token = self.authenticate()
+
+        auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+        auth.set_access_token(token.key, token.secret)
+
+        if token:
+            return auth
+
+        return None
+
+
+
+CONSUMER_KEY    = 'jcnRYH3fbpQv6DrxWfjQA'
+CONSUMER_SECRET = 'opXtC8A0Er12mgUkchTpgqWgX6Yuv7jIPmfwA5LIls'
+AUTH_FILE       = '.twit-twqueue'
+QUEUE_FILE      = 'tweets.txt'
+
+if __name__ == '__main__':
+
+    parser = optparse.OptionParser(
+        description='A twitter bot that allows many users to post tweets from the same account.'
+    )
+
+    parser.add_option('--auth', '-a',   action='store_true',    
+        help='re-authenticate with twitter'
+    )
+    parser.add_option('--fetch','-f',   action='store_true',
+        help='fetch and append new direct messages to the queue'
+    )
+    parser.add_option('--post', '-p',   action='store', type='int', metavar='NUM',
+        help='post NUM messages to twitter from the queue'
+    )
+
+    (options, args) = parser.parse_args()
+
+    twqueue = Twqueue(CONSUMER_KEY, CONSUMER_SECRET, AUTH_FILE, QUEUE_FILE)
+
+    if options.auth:
+        twqueue.authenticate()
+
+    if options.fetch:
+        twqueue.fetch_messages()
+
+    if options.post:
+        twqueue.post_messages(options.post)
