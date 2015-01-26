@@ -11,7 +11,6 @@ import tweepy
 class Twqueue:
 
     def __init__(self, con_key, con_sec, auth_file, queue_file):
-
         self.log = logging.getLogger('Twit-Twqueue')
         self.con_key    = con_key
         self.con_sec    = con_sec
@@ -20,7 +19,6 @@ class Twqueue:
 
 
     def fetch_queue(self):
-
         f = open(self.queue_file, 'r')
         raw_file = f.read()
         f.close()
@@ -33,13 +31,11 @@ class Twqueue:
 
 
     def store_queue(self, queue):
-
         f = open(self.queue_file, 'w')
         f.write("\n".join(queue))
 
 
     def fetch_messages(self):
-
         auth    = self.get_auth()
         queue   = self.fetch_queue()
 
@@ -47,7 +43,6 @@ class Twqueue:
         direct_messages.reverse()
 
         for msg in direct_messages:
-
             self.log.info("DM recieved from %s: '%s'" % (msg.sender_screen_name, msg.text))
             queue.append(msg.text)
             tweepy.API(auth).destroy_direct_message(msg.id)
@@ -56,13 +51,11 @@ class Twqueue:
 
 
     def post_messages(self, amount):
-
         auth    = self.get_auth()
         queue   = self.fetch_queue()
 
         for i in range(0, amount):
             if queue:
-
                 msg = queue.popleft()
                 if msg:
                     self.log.info("Posting message: %s" % msg)
@@ -72,9 +65,7 @@ class Twqueue:
 
 
     def authenticate(self):
-
         auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-
         print "\nOpen this URL and, then input the PIN you are given.\n\n\t%s\n" % auth.get_authorization_url()
 
         pin = raw_input('PIN: ').strip()
@@ -87,7 +78,6 @@ class Twqueue:
 
 
     def get_auth(self):
-
         token = ''
         if os.path.exists(self.auth_file):
             token = pickle.load(open(self.auth_file))
@@ -110,7 +100,6 @@ AUTH_FILE       = '.twit-twqueue'
 QUEUE_FILE      = 'tweets.txt'
 
 if __name__ == '__main__':
-
     parser = optparse.OptionParser(
         description='A twitter bot that allows many users to post tweets from the same account.'
     )
